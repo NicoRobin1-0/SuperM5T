@@ -1,38 +1,48 @@
 import os
 import asyncio
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from groq import Groq
 
-# 1. Key များကို ရယူခြင်း
+# Render Web Port အတွက် Fake Web Server လေး ထည့်ပေးထားခြင်း
+class DummyServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), DummyServer)
+    server.serve_forever()
+
+# Dummy Server ကို Background တွင် Run ခြင်း
+threading.Thread(target=run_dummy_server, daemon=True).start()
+
+# Key များကို ရယူခြင်း
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# Groq AI ချိတ်ဆက်ခြင်း
 client = Groq(api_key=GROQ_API_KEY)
 
-# /start လို့ စာပို့ရင် ပြန်ဖြေမည့် Function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ သားသားရဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
+    await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
 
-# စာများ ပို့လာပါက AI က စဉ်းစားပြီး ပြန်ဖြေပေးမည့် Function
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    
-    # AI ထံ မေးခွန်းပို့ပြီး မြန်မာလို အစွမ်းကုန် စဉ်းစားခိုင်းခြင်း
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",  # သို့မဟုတ် deepseek-r1-distill-llama-70b
+        model="llama-3.1-70b-versatile",
         messages=[
             {"role": "system", "content": "You are a helpful and smart AI assistant who understands and replies fluently in Myanmar language."},
             {"role": "user", "content": user_text}
         ]
     )
-    
     reply_text = response.choices[0].message.content
     await update.message.reply_text(reply_text)
 
 if __name__ == '__main__':
-    # Telegram Bot စတင်ခြင်း
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
