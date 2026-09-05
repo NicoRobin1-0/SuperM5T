@@ -25,7 +25,9 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # Gemini Setup
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Gemini 1.5/2.5 Model ကို စနစ်တကျ ခေါ်ယူခြင်း
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
@@ -38,7 +40,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(response.text)
     except Exception as e:
-        await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
+        # Fallback လုပ်ဆောင်ချက် - အကယ်၍ models/ Prefix မပါဘဲ စမ်းသပ်ခြင်း
+        try:
+            fallback_model = genai.GenerativeModel('gemini-1.5-flash')
+            res = fallback_model.generate_content(user_text)
+            await update.message.reply_text(res.text)
+        except Exception as err:
+            await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
 
 if __name__ == '__main__':
     app = Application.builder().token(TELEGRAM_TOKEN).build()
