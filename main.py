@@ -32,23 +32,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Groq တွင် လက်ရှိ အလုပ်လုပ်သော Model အသစ်
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
-                {"role": "user", "content": user_text}
-            ]
-        )
-        reply_text = response.choices[0].message.content
-        await update.message.reply_text(reply_text)
-    except Exception as e:
-        await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
-
-if __name__ == '__main__':
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    app.run_polling()                {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
                 {"role": "user", "content": user_text}
             ]
         )
