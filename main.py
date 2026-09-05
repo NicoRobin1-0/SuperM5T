@@ -4,7 +4,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from groq import Groq
+import google.generativeai as genai
 
 # Render Web Port အတွက် Fake Web Server
 class DummyServer(BaseHTTPRequestHandler):
@@ -21,9 +21,11 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-client = Groq(api_key=GROQ_API_KEY)
+# Gemini Setup
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
@@ -31,15 +33,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
-                {"role": "user", "content": user_text}
-            ]
+        response = model.generate_content(
+            f"You are a helpful AI assistant. Reply fluently in Myanmar language.\nUser message: {user_text}"
         )
-        reply_text = response.choices[0].message.content
-        await update.message.reply_text(reply_text)
+        await update.message.reply_text(response.text)
     except Exception as e:
         await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
 
