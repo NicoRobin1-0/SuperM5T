@@ -1,4 +1,6 @@
 import os
+import re
+import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 from telegram import Update
@@ -20,41 +22,76 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-HF_TOKEN = os.environ.get("HF_TOKEN") # Render အဝန်းအဝိုင်းမှ HF_TOKEN ကို ဖတ်ယူခြင်း
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
-# Models စာရင်း
-MODELS = [
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "meta-llama/Llama-3.2-3B-Instruct",
-    "HuggingFaceH4/zephyr-7b-beta"
-]
+# မြန်မာဘာသာစကားနှင့် ကလေးများအတွက် သင်တော်သော Model
+TEXT_MODEL = "Qwen/Qwen2.5-72B-Instruct"
+
+# ကလေးများအတွက် ဖော်ရွေသော Prompt စနစ်
+SYSTEM_PROMPT = (
+    "You are a friendly, kind, and smart AI assistant for kids and learners. "
+    "Always speak in clean, highly natural, polite, and grammatically correct Myanmar language (Burmese). "
+    "Encourage creativity, fun learning, and curiosity. Keep your answers easy to understand for children."
+)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
+    welcome_text = (
+        "မင်္ဂလာပါကွယ်... 🌟\n"
+        "ဦးဦး ကလေးတို့ရဲ့ AI စက်ရုပ်ငယ်လေးပါပဲ။\n\n"
+        "✨ စာအုပ်ထဲက သိချင်တာတွေ မေးလို့ရတယ်\n"
+        "🎨 'ပုံဆွဲပေးပါ' ဆိုရင် ပုံလှလှလေးတွေ ဆွဲပေးမယ်\n"
+        "🧩 ပဟေဠိနဲ့ စိတ်ကူးယဉ် ပုံပြင်တွေလည်း ပြောပြပေးမယ်နော်!"
+    )
+    await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    messages = [
-        {"role": "system", "content": "You are a helpful AI assistant. Always respond fluently in Myanmar language."},
-        {"role": "user", "content": user_text}
-    ]
     
-    # Model များကို တစ်ခုပြီးတစ်ခု စမ်းသပ်မည့် ပတ်လမ်း
-    for model_name in MODELS:
+    # ၁။ ပုံဆွဲခိုင်းကြောင်း စစ်ဆေးခြင်း (Image Request)
+    image_keywords = ["ပုံဆွဲ", "ပုံဆွဲပေး", "ပုံပြပါ", "draw", "image", "picture", "photo"]
+    is_image_request = any(keyword in user_text.lower() for keyword in image_keywords)
+    
+    if is_image_request:
+        await update.message.reply_text("ခဏလေးစောင့်နော်... ဦးဦး ပုံလှလှလေး ဆွဲပေးနေပါတယ်။ 🎨✨")
         try:
-            client = InferenceClient(model=model_name, token=HF_TOKEN, timeout=30)
-            response = client.chat_completion(
-                messages=messages,
-                max_tokens=500,
-                temperature=0.7
-            )
-            reply = response.choices[0].message.content
-            await update.message.reply_text(reply)
-            return  # အောင်မြင်ပါက ပတ်လမ်းကို ရပ်မည်
-        except Exception:
-            continue  # အဆင်မပြေပါက နောက်တစ်မျိုးသို့ ပြောင်းမည်
+            # မြန်မာလိုပြောထားသည်များကို English Prompt သို့ ပြောင်းလဲခြင်း
+            client = InferenceClient(model=TEXT_MODEL, token=HF_TOKEN, timeout=20)
+            translate_prompt = [
+                {"role": "system", "content": "Translate the user's image request into a detailed image generation prompt in English. Output only the English prompt."},
+                {"role": "user", "content": user_text}
+            ]
+            trans_res = client.chat_completion(messages=translate_prompt, max_tokens=100)
+            english_prompt = trans_res.choices[0].message.content.strip()
             
-    await update.message.reply_text("ခဏမျှ တောင်းပန်ပါသည်၊ Server မျာ ခေတ္တ အလုပ်ရှုပ်နေပါသဖြင့် နောက်မှ ပြန်စမ်းကြည့်ပေးပါ။")
+            # Pollinations.ai အခမဲ့ Image Generator ကို သုံး၍ ပုံထုတ်ခြင်း
+            encoded_prompt = urllib.parse.quote(english_prompt)
+            image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed=42"
+            
+            await update.message.reply_photo(photo=image_url, caption=f"🖼️ ကလေးလေး တောင်းဆိုထားတဲ့ ပုံလေး ရပါပြီရှင်!\n\n*(Prompt: {english_prompt})*")
+            return
+        except Exception as e:
+            await update.message.reply_text("ပုံဆွဲရာတွင် အခက်အခဲရှိသွားပါသည်၊ နောက်တစ်ကြိမ် ပြန်စမ်းကြည့်ပေးပါနော်။")
+            return
+
+    # ၂။ စကားပြောဆိုခြင်းနှင့် စာမေးခြင်း (Text Chat Response)
+    try:
+        client = InferenceClient(model=TEXT_MODEL, token=HF_TOKEN, timeout=30)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_text}
+        ]
+        
+        response = client.chat_completion(
+            messages=messages,
+            max_tokens=600,
+            temperature=0.7
+        )
+        
+        reply = response.choices[0].message.content
+        await update.message.reply_text(reply)
+        
+    except Exception as e:
+        await update.message.reply_text("ဦးဦး စဉ်းစားရတာ ခဏလေး လိုင်းထွေးသွားလို့ပါ၊ နောက်တစ်ခေါက် ပြန်မေးကြည့်ပေးပါဦးနော်။")
 
 if __name__ == '__main__':
     app = Application.builder().token(TELEGRAM_TOKEN).build()
