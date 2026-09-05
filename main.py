@@ -1,12 +1,11 @@
 import os
-import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+from huggingface_hub import InferenceClient
 
-# Render Web Port အတွက် Dummy Server
+# Render Web Port အတွက် Keep-Alive Server
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -21,10 +20,9 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# SDK အသစ်တွင် API Key အား တိုက်ရိုက် သတ်မှတ်ခြင်း
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Free Hugging Face Open-Source Model (No API Key Required for basic inference)
+client = InferenceClient("meta-llama/Llama-3.3-70B-Instruct")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
@@ -32,22 +30,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     try:
-        # Gemini 2.5 Flash ကို သုံးရန်
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=f"You are a helpful AI assistant. Reply fluently in Myanmar language.\nUser message: {user_text}",
+        messages = [
+            {"role": "system", "content": "You are a helpful and intelligent AI assistant. Always respond fluently and naturally in Myanmar language."},
+            {"role": "user", "content": user_text}
+        ]
+        
+        # Free Server မှ Response တောင်းယူခြင်း
+        response = client.chat_completion(
+            messages=messages,
+            max_tokens=500,
+            temperature=0.7
         )
-        await update.message.reply_text(response.text)
+        
+        reply_text = response.choices[0].message.content
+        await update.message.reply_text(reply_text)
+        
     except Exception as e:
-        # အကယ်၍ 2.5 အဆင်မပြေပါက 1.5 Flash သို့ Fallback လုပ်ရန်
-        try:
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=user_text,
-            )
-            await update.message.reply_text(response.text)
-        except Exception as err:
-            await update.message.reply_text(f"Error တက်သွားပါသည်: {str(err)}")
+        await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
 
 if __name__ == '__main__':
     app = Application.builder().token(TELEGRAM_TOKEN).build()
