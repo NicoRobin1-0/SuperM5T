@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from groq import Groq
 
-# Render Web Port အတွက် Fake Web Server လေး ထည့်ပေးထားခြင်း
+# Render Web Port အတွက် Fake Web Server
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -18,10 +18,8 @@ def run_dummy_server():
     server = HTTPServer(('0.0.0.0', port), DummyServer)
     server.serve_forever()
 
-# Dummy Server ကို Background တွင် Run ခြင်း
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# Key များကို ရယူခြင်း
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
@@ -32,20 +30,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
-        messages=[
-            {"role": "system", "content": "You are a helpful and smart AI assistant who understands and replies fluently in Myanmar language."},
-            {"role": "user", "content": user_text}
-        ]
-    )
-    reply_text = response.choices[0].message.content
-    await update.message.reply_text(reply_text)
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
+                {"role": "user", "content": user_text}
+            ]
+        )
+        reply_text = response.choices[0].message.content
+        await update.message.reply_text(reply_text)
+    except Exception as e:
+        await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
 
 if __name__ == '__main__':
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("Bot is running 24/7...")
     app.run_polling()
