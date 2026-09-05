@@ -58,4 +58,28 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
+    app.run_polling(drop_pending_updates=True)    reply_text = None
+
+    for m_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(m_name)
+            response = model.generate_content(
+                f"You are a helpful AI assistant. Reply fluently in Myanmar language.\nUser message: {user_text}"
+            )
+            reply_text = response.text
+            break
+        except Exception as e:
+            continue
+
+    if reply_text:
+        await update.message.reply_text(reply_text)
+    else:
+        await update.message.reply_text("Gemini API Error တက်နေပါသည်၊ ခဏနေမှ ပြန်စမ်းပေးပါခင်ဗျာ။")
+
+if __name__ == '__main__':
+    # Telegram Bot Instance ပြိုင်မ run စေရန်
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     app.run_polling(drop_pending_updates=True)
