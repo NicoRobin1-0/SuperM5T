@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from groq import Groq
 
-# Render Web Port အဆင်ပြေစေရန် Fake Web Server ထည့်သွင်းခြင်း
+# Render Web Port အတွက် Fake Web Server
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -35,20 +35,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model="llama3-70b-8192",  # Groq တွင် သေချာပေါက် အလုပ်လုပ်သော Model
             messages=[
                 {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
-                {"role": "user", "content": user_text}
-            ]
-        )
-        reply_text = response.choices[0].message.content
-        await update.message.reply_text(reply_text)
-    except Exception as e:
-        await update.message.reply_text(f"Error တက်သွားပါသည်: {str(e)}")
-
-if __name__ == '__main__':
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    app.run_polling()                {"role": "system", "content": "You are a helpful AI assistant who understands and replies fluently in Myanmar language."},
                 {"role": "user", "content": user_text}
             ]
         )
