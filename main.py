@@ -1,41 +1,120 @@
 import os
-import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 from groq import Groq
 
-# 1. Key များကို ရယူခြင်း
+# =========================
+# API Keys
+# =========================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# Groq AI ချိတ်ဆက်ခြင်း
+if not TELEGRAM_TOKEN:
+    raise ValueError("TELEGRAM_TOKEN မတွေ့ပါ။")
+
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY မတွေ့ပါ။")
+
+# =========================
+# Groq Client
+# =========================
 client = Groq(api_key=GROQ_API_KEY)
 
-# /start လို့ စာပို့ရင် ပြန်ဖြေမည့် Function
+MODEL = "llama-3.3-70b-versatile"
+
+
+# =========================
+# /start
+# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါ! အမြဲတမ်း နိုးကြားနေတဲ့ သားသားရဲ့ AI အကူစက်ရုပ်လေးပါ။ ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?")
-
-# စာများ ပို့လာပါက AI က စဉ်းစားပြီး ပြန်ဖြေပေးမည့် Function
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
-    
-    # AI ထံ မေးခွန်းပို့ပြီး မြန်မာလို အစွမ်းကုန် စဉ်းစားခိုင်းခြင်း
-    response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",  # သို့မဟုတ် deepseek-r1-distill-llama-70b
-        messages=[
-            {"role": "system", "content": "You are a helpful and smart AI assistant who understands and replies fluently in Myanmar language."},
-            {"role": "user", "content": user_text}
-        ]
+    await update.message.reply_text(
+        "မင်္ဂလာပါ! 🤖\n"
+        "သားသားရဲ့ AI အကူစက်ရုပ်လေးပါ။\n"
+        "ဘာခိုင်းချင်ပါသလဲခင်ဗျာ?"
     )
-    
-    reply_text = response.choices[0].message.content
-    await update.message.reply_text(reply_text)
 
-if __name__ == '__main__':
-    # Telegram Bot စတင်ခြင်း
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    print("Bot is running 24/7...")
+
+# =========================
+# Handle Messages
+# =========================
+async def handle_message(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    if not update.message or not update.message.text:
+        return
+
+    user_text = update.message.text
+
+    try:
+        # Groq API
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful and smart AI assistant. "
+                        "You understand Myanmar language very well. "
+                        "Always reply naturally and clearly in Myanmar "
+                        "language when the user speaks Myanmar."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": user_text,
+                },
+            ],
+        )
+
+        reply_text = response.choices[0].message.content
+
+        if not reply_text:
+            reply_text = "တောင်းပန်ပါတယ်။ အဖြေမရရှိသေးပါ။"
+
+        await update.message.reply_text(reply_text)
+
+    except Exception as e:
+        print("Groq Error:", repr(e))
+
+        await update.message.reply_text(
+            "တောင်းပန်ပါတယ်ခင်ဗျာ 😥\n"
+            "AI server ဘက်မှာ ခဏအခက်အခဲရှိနေပါတယ်။"
+        )
+
+
+# =========================
+# Main
+# =========================
+def main():
+
+    app = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .build()
+    )
+
+    app.add_handler(
+        CommandHandler("start", start)
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_message
+        )
+    )
+
+    print("Bot is running...")
+
     app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
