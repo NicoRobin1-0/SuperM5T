@@ -1,2 +1,2 @@
 python-telegram-bot
-huggingface-hf
+gemini-3.6-flash-ai
