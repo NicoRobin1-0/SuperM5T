@@ -6,10 +6,10 @@ from groq import Groq
 
 # 1. Key များကို ရယူခြင်း
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# GEMINI AI ချိတ်ဆက်ခြင်း
-client = GEMINI(api_key=GEMINI_API_KEY)
+# Groq AI ချိတ်ဆက်ခြင်း
+client = Groq(api_key=GROQ_API_KEY)
 
 # /start လို့ စာပို့ရင် ပြန်ဖြေမည့် Function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,7 +21,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # AI ထံ မေးခွန်းပို့ပြီး မြန်မာလို အစွမ်းကုန် စဉ်းစားခိုင်းခြင်း
     response = client.chat.completions.create(
-        model="gemini3.6flash",  # သို့မဟုတ် google-gemini-3.6-flash
+        model="llama-3.1-70b-versatile",  # သို့မဟုတ် deepseek-r1-distill-llama-70b
         messages=[
             {"role": "system", "content": "You are a helpful and smart AI assistant who understands and replies fluently in Myanmar language."},
             {"role": "user", "content": user_text}
